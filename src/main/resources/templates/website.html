@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${site.name})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="container py-4">
+  <a th:href="@{/dashboard}">Back to dashboard</a>
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mt-2 mb-3">
+    <div>
+      <h1 class="mb-1" th:text="${site.name}">Site</h1>
+      <div><span class="pill" th:classappend="${site.statusClass}" th:text="${site.statusLabel}">Online</span>
+        <a class="ms-2 site-url" th:href="${site.url}" target="_blank" rel="noopener noreferrer" th:text="${site.url}">url</a></div>
+      <div class="site-url mt-1" th:if="${site.enabled and site.lastError != null}" th:text="'Last error: ' + ${site.lastError}"></div>
+    </div>
+    <div class="d-flex gap-2">
+      <form th:action="@{/websites/{id}/toggle(id=${site.id})}" method="post">
+        <input type="hidden" name="from" value="details">
+        <button class="btn btn-quiet" type="submit" th:text="${site.enabled} ? 'Pause monitoring' : 'Resume monitoring'">Pause</button></form>
+      <form th:action="@{/websites/{id}/delete(id=${site.id})}" method="post"
+            onsubmit="return confirm('Delete this website and all of its history?');">
+        <button class="btn btn-danger-quiet" type="submit">Delete</button></form>
+    </div>
+  </div>
+
+  <div th:replace="~{fragments/layout :: flash}"></div>
+
+  <div class="band">
+    <div><div class="num" th:classappend="${stats.uptime24hClass}" th:text="${stats.uptime24hText}">—</div><div class="lbl">Uptime, last 24 hours</div></div>
+    <div><div class="num" th:classappend="${stats.uptime7dClass}" th:text="${stats.uptime7dText}">—</div><div class="lbl">Uptime, last 7 days</div></div>
+    <div><div class="num" th:text="${stats.avgText}">—</div><div class="lbl">Average response, 24 hours</div></div>
+    <div><div class="num" th:text="${stats.downtimeText}">0s</div><div class="lbl">Total downtime, 7 days</div></div>
+  </div>
+
+  <section class="panel">
+    <h2>Response time, last 60 checks</h2>
+    <div class="chart-box"><canvas id="rt" th:data-url="@{/api/websites/{id}/history(id=${site.id})}" aria-label="Response time chart" role="img"></canvas></div>
+    <p class="muted mb-0 mt-2" id="chartNote" style="display:none">No checks yet. The first one runs within seconds.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Daily report, last 7 days</h2>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Day</th><th>Checks</th><th>Failed</th><th>Uptime</th><th>Average response</th></tr></thead>
+      <tbody><tr th:each="d : ${daily}">
+        <td th:text="${d.dateText}">Mon</td><td th:text="${d.total}">0</td>
+        <td th:text="${d.downChecks}">0</td><td th:text="${d.uptimeText}">—</td><td th:text="${d.avgText}">—</td>
+      </tr></tbody></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Incidents</h2>
+    <p class="muted mb-0" th:if="${incidents.isEmpty()}">No downtime recorded for this website.</p>
+    <div class="table-wrap" th:unless="${incidents.isEmpty()}"><table class="table">
+      <thead><tr><th>Went down</th><th>Recovered</th><th>Duration</th><th>Reason</th></tr></thead>
+      <tbody><tr th:each="i : ${incidents}">
+        <td th:text="${i.startedAtText}">—</td>
+        <td><span th:if="${i.ongoing}" class="pill down">Still down</span><span th:unless="${i.ongoing}" th:text="${i.resolvedAtText}">—</span></td>
+        <td th:text="${i.durationText}">—</td><td class="site-url" th:text="${i.reason}">—</td>
+      </tr></tbody></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Check history</h2>
+    <p class="muted mb-0" th:if="${recent.isEmpty()}">Nothing recorded yet.</p>
+    <div class="table-wrap" th:unless="${recent.isEmpty()}"><table class="table">
+      <thead><tr><th>Time</th><th>Result</th><th>HTTP status</th><th>Response</th><th>Error</th></tr></thead>
+      <tbody><tr th:each="c : ${recent}">
+        <td th:text="${c.checkedAtText}">—</td>
+        <td><span class="pill" th:classappend="${c.up} ? 'up' : 'down'" th:text="${c.up} ? 'Up' : 'Down'">Up</span></td>
+        <td th:text="${c.statusCode != null} ? ${c.statusCode} : '—'">200</td>
+        <td th:text="${c.responseTimeMs != null} ? ${c.responseTimeMs} + ' ms' : '—'">—</td>
+        <td class="site-url" th:text="${c.error}"></td>
+      </tr></tbody></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Settings</h2>
+    <form th:action="@{/websites/{id}/edit(id=${site.id})}" th:object="${form}" method="post" class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label" for="name">Name</label><input class="form-control" id="name" th:field="*{name}" maxlength="100"></div>
+      <div class="col-md-5"><label class="form-label" for="url">URL</label><input class="form-control" id="url" th:field="*{url}" required></div>
+      <div class="col-md-2"><label class="form-label" for="intervalSeconds">Check every (seconds)</label><input class="form-control" id="intervalSeconds" type="number" min="30" th:field="*{intervalSeconds}"></div>
+      <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Save changes</button></div>
+    </form>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  var canvas = document.getElementById('rt');
+  var chart = new Chart(canvas, {
+    type: 'line',
+    data: { labels: [], datasets: [{ label: 'Response time (ms)', data: [], borderColor: '#1f5fbf', backgroundColor: 'rgba(31,95,191,.08)',
+             fill: true, tension: .25, borderWidth: 2, pointRadius: 3, pointBackgroundColor: [] }] },
+    options: { maintainAspectRatio: false, animation: false,
+               plugins: { legend: { display: false } },
+               scales: { y: { beginAtZero: true, title: { display: true, text: 'ms' } }, x: { ticks: { maxTicksLimit: 8 } } } }
+  });
+  function load() {
+    fetch(canvas.dataset.url, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (pts) {
+      document.getElementById('chartNote').style.display = pts.length ? 'none' : 'block';
+      chart.data.labels = pts.map(function (p) { return p.time; });
+      var ds = chart.data.datasets[0];
+      ds.data = pts.map(function (p) { return p.up ? p.ms : 0; });          // a failed check is drawn at 0 ms
+      ds.pointBackgroundColor = pts.map(function (p) { return p.up ? '#1f5fbf' : '#d2382f'; });
+      ds.pointRadius = pts.map(function (p) { return p.up ? 3 : 6; });
+      chart.update();
+    });
+  }
+  load();
+  setInterval(load, 15000);
+</script>
+</body>
+</html>

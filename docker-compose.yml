@@ -1,0 +1,52 @@
+name: sitewatch
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-sitewatch}
+      MYSQL_USER: ${MYSQL_USER:-sitewatch}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sitewatch-pass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root-pass}
+      TZ: ${TZ:-Asia/Kolkata}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build: .
+    image: sitewatch:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      TZ: ${TZ:-Asia/Kolkata}
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE:-sitewatch}?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-sitewatch}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-sitewatch-pass}
+      # Demo only: lets SiteWatch monitor the "demo-site" container below. Set to false in real deployments.
+      SITEWATCH_ALLOW_PRIVATE_HOSTS: ${SITEWATCH_ALLOW_PRIVATE_HOSTS:-true}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # A harmless website you can stop and start to demonstrate downtime detection.
+  # In SiteWatch add:  http://demo-site   then run:  docker compose stop demo-site
+  demo-site:
+    image: nginx:alpine
+    restart: "no"
+
+volumes:
+  db_data:

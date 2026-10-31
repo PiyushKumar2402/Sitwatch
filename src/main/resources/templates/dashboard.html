@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Dashboard')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<main class="container py-4">
+  <div th:replace="~{fragments/layout :: flash}"></div>
+
+  <div class="band mb-3">
+    <div><div class="num" th:text="${total}">0</div><div class="lbl">Websites monitored</div></div>
+    <div><div class="num up" th:text="${upCount}">0</div><div class="lbl">Online now</div></div>
+    <div><div class="num" th:classappend="${downCount > 0} ? 'down'" th:text="${downCount}">0</div><div class="lbl">Down now</div></div>
+    <div><div class="num" th:text="${avgText}">—</div><div class="lbl">Average response</div></div>
+  </div>
+
+  <section class="panel">
+    <h2>Add a website</h2>
+    <form id="addForm" th:action="@{/websites}" method="post" class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label" for="name">Name</label>
+        <input class="form-control" id="name" name="name" maxlength="100" placeholder="My college site"></div>
+      <div class="col-md-5"><label class="form-label" for="url">URL</label>
+        <input class="form-control" id="url" name="url" required placeholder="https://example.com"></div>
+      <div class="col-md-2"><label class="form-label" for="intervalSeconds">Check every</label>
+        <select class="form-select" id="intervalSeconds" name="intervalSeconds">
+          <option value="30">30 seconds</option><option value="60" selected>1 minute</option>
+          <option value="300">5 minutes</option><option value="900">15 minutes</option>
+        </select></div>
+      <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Start monitoring</button></div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Your websites</h2>
+    <p class="muted mb-0" th:if="${rows.isEmpty()}">No websites yet. Add your first URL above and SiteWatch starts checking within seconds.</p>
+    <div class="table-wrap" th:unless="${rows.isEmpty()}">
+      <table class="table">
+        <thead><tr><th>Website</th><th>Status</th><th>Response</th><th>Uptime 24h</th><th>Uptime 7d</th><th>Last check</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="r : ${rows}">
+          <td>
+            <a class="site-name" th:href="@{/websites/{id}(id=${r.site.id})}" th:text="${r.site.name}">name</a>
+            <div class="site-url" th:text="${r.site.url}">url</div>
+            <span class="strip" th:title="'Last ' + ${r.strip.size()} + ' checks'"><i th:each="s : ${r.strip}" th:class="${s}"></i></span>
+          </td>
+          <td><span class="pill" th:classappend="${r.site.statusClass}" th:text="${r.site.statusLabel}">Online</span>
+              <div class="site-url" th:if="${r.site.enabled and r.site.lastError != null}" th:text="${r.site.lastError}"></div></td>
+          <td th:text="${r.site.lastResponseText}">—</td>
+          <td th:class="${r.stats.uptime24hClass}" th:text="${r.stats.uptime24hText}">—</td>
+          <td th:class="${r.stats.uptime7dClass}" th:text="${r.stats.uptime7dText}">—</td>
+          <td class="site-url" th:text="${r.site.lastCheckedAtText}">—</td>
+          <td class="text-nowrap text-end">
+            <form th:action="@{/websites/{id}/toggle(id=${r.site.id})}" method="post" class="d-inline">
+              <button class="btn btn-quiet btn-sm" type="submit" th:text="${r.site.enabled} ? 'Pause' : 'Resume'">Pause</button></form>
+            <form th:action="@{/websites/{id}/delete(id=${r.site.id})}" method="post" class="d-inline"
+                  onsubmit="return confirm('Delete this website and all of its history?');">
+              <button class="btn btn-danger-quiet btn-sm" type="submit">Delete</button></form>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Recent incidents</h2>
+    <p class="muted mb-0" th:if="${incidents.isEmpty()}">No downtime recorded. Incidents appear here the moment a site stops responding.</p>
+    <div class="table-wrap" th:unless="${incidents.isEmpty()}">
+      <table class="table">
+        <thead><tr><th>Website</th><th>Went down</th><th>Recovered</th><th>Duration</th><th>Reason</th></tr></thead>
+        <tbody>
+        <tr th:each="i : ${incidents}">
+          <td><a class="site-name" th:href="@{/websites/{id}(id=${i.website.id})}" th:text="${i.website.name}">site</a></td>
+          <td th:text="${i.startedAtText}">—</td>
+          <td><span th:if="${i.ongoing}" class="pill down">Still down</span><span th:unless="${i.ongoing}" th:text="${i.resolvedAtText}">—</span></td>
+          <td th:text="${i.durationText}">—</td>
+          <td class="site-url" th:text="${i.reason}">—</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+  // Refresh every 15 s, but never while someone is typing in the add form.
+  setInterval(function () {
+    var f = document.getElementById('addForm');
+    if (!f.contains(document.activeElement) && !document.getElementById('url').value) location.reload();
+  }, 15000);
+</script>
+</body>
+</html>
