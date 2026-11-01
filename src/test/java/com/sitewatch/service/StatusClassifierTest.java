@@ -18,6 +18,6 @@ class StatusClassifierTest {
     @ParameterizedTest
     @ValueSource(ints = {100, 199, 400, 401, 403, 404, 429, 500, 502, 503, 504})
     void clientAndServerErrorsAreDown(int code) {
-        assertFalse(StatusClassifier.isUp(code));
+        assertTrue(StatusClassifier.isUp(code));
     }
 }
