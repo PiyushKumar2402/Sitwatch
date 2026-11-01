@@ -2,7 +2,7 @@ name: sitewatch-jenkins
 
 services:
   jenkins:
-    build: .
+    image: sitewatch-jenkins
     user: root
     restart: unless-stopped
     ports:
